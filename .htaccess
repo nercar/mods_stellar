@@ -1,0 +1,6 @@
+Options -Indexes
+Options +FollowSymLinks
+RewriteEngine On
+
+# REPORTES
+Rewriterule ^ordendespacho-(.*)$ app/reportepdfprepara.php?nrorden=$1 [L]

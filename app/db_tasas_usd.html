@@ -1,0 +1,194 @@
+<!-- Main row -->
+<div class="row">
+	<div class="d-flex col-12 mt-2">
+		<div class="d-flex mr-auto col-6 align-items-baseline">
+			<label for="fechausd">Fecha</label>
+			<input id="fechausd" name="fechausd" type="text" class="ml-2 mr-2 form-control form-control-sm text-center" 
+					autocomplete="off" data-inputmask="'alias': 'dd-mm-yyyy'" data-mask placeholder="dd-mm-yyyy">
+			<label for="montousd">Monto</label>
+			<input type="text" placeholder="9,999,999,999.9999"
+				class="ml-2 mr-2 form-control form-control-sm text-right"
+				id="montousd" value="">
+			<button class="btn btn-sm btn-outline-success col-3 ml-auto mr-auto" disabled id="btn_guardar"
+				onclick="guardarTasaDolar($('#montousd').val()/10000, moment($('#fechausd').val(), 'DD-MM-YYYY').format('YYYY-MM-DD'))">
+				<i class="fas fa-save"></i> Guardar
+			</button>
+		</div>
+		<div class="d-flex ml-auto col-2 align-items-baseline">
+			<label for="fechaf">Mes </label>	
+			<div class="input-group date">
+				<input id="fechaf" name="fechaf" type="text" class="form-control form-control-sm rounded text-center ml-1" 
+					data-inputmask="'alias': 'mm-yyyy'"
+					data-mask placeholder="mm-yyyy">
+			</div>
+		</div>
+	</div>
+	<div class="col-md-12 col-sm-12 mt-1">
+		<div class="card card-warning elevation-2 border border-dark" id="div_lstTasasUSDs">
+			<div class="card-header p-1 d-flex align-items-center">
+				<i class="fas fa-users"></i>&nbsp;Listado de Tasas por Divisas
+				<div class="custom-control custom-checkbox ml-auto pl-4">
+					<input type="checkbox" checked class="custom-control-input" id="sincronizar">
+					<label class="custom-control-label font-weight-normal" for="sincronizar">Sincronización Automática</label>
+				</div>
+			</div>
+			<div class="row m-0 pl-1 pr-1 pb-1" id="divDatos">
+				<div class="col-12">
+					<table id="lstTasasUSD" cellpadding="0" cellspacing="0"
+							class="table table-striped table-hover w-100">
+						<thead class="bg-dark-gradient">
+							<tr>
+								<th width="15%" class="text-center border border-top-0 border-bottom-0">Fecha</th>
+								<th width="15%" class="text-center border border-top-0 border-bottom-0">Tasa</th>
+								<th width="45%" class="text-center border border-top-0 border-bottom-0">Modificado por</th>
+								<th width="20%" class="text-center border border-top-0 border-bottom-0">Modificado el</th>
+								<th width=" 5%" class="text-center border border-top-0 border-bottom-0">Act.</th>
+							</tr>
+						</thead>
+					</table>
+				</div>
+			</div>
+			<!-- /.card-body -->
+		</div>
+		<!-- /.col -->
+	</div>
+	<!-- /.col -->
+</div>
+<!-- /.row (main row 2) -->
+
+<script>
+	$('#divDatos').height($('#wp_ppal').height()-$('#sincronizar').offset().top+'px');
+	var altoTablaPpal = $('#divDatos').height()-40;
+
+	$('#fechausd').datepicker({
+		format: "dd-mm-yyyy",
+		todayBtn: "linked",
+		language: "es",
+		autoclose: true,
+		todayHighlight: true,
+	});
+	$('#fechaf').datepicker({
+		changeMonth: true,
+		changeYear: true,
+		showButtonPanel: true,
+		language: "es",
+		autoclose: true,
+		format: "mm-yyyy",
+		startView: "months", 
+		minViewMode: "months"
+	});
+	$("#fechaf").datepicker().datepicker("setDate", new Date());
+
+	$("#fechausd").datepicker().datepicker("setDate", new Date());
+	$('[data-mask]').inputmask();
+	$('#montousd').inputmask('9,999,999,999.9999', { numericInput: true, autoUnmask : true });
+	$('#montousd').keyup(function() {
+		if(this.value>=0 && this.value!='') {
+			$('#btn_guardar').attr('disabled', false);
+		} else {
+			$('#btn_guardar').attr('disabled', true);
+		}
+	})
+
+	$('#fechaf').on('change', function() {
+		$('#lstTasasUSD').dataTable().fnFilter(this.value);
+	});
+
+	$('#lstTasasUSD').dataTable( {
+		scrollY        : altoTablaPpal + 'px',
+		scrollCollapse : false,
+		searching      : true,
+		autoWidth      : false,
+		order: [ 3, 'desc' ],
+		ajax: {
+			url: 'app/DBProcs.php',
+			data: { opcion: 'lstTasasUSD' },
+			type: 'POST',
+			dataType: 'json',
+		},
+		columns: [
+			{data: null,
+				render: function(data) {
+					return '<span style="display: none;">'+moment(data.ultima_modificacion).format('YYYY-MM-DD H:m:s')+'</span>'+data.fecha;
+				},
+				sClass: 'text-center font-weight-bold align-middle border border-top-0 border-bottom-0'
+			},
+			{data: 'tasa',   sClass: 'text-right align-middle border border-top-0 border-bottom-0',
+				render: $.fn.dataTable.render.number(",", ".", 4)},
+			{data: 'modificado_por', sClass: 'align-middle border border-top-0 border-bottom-0'},
+			{data: null,
+				render: function(data) {
+					return '<span style="display: none;">'+data.ultima_modificacion+'</span>'+data.ultima_fecha;
+				},
+				sClass: 'text-center align-middle border border-top-0 border-bottom-0'
+			},
+			{ data: null,
+				render: function(data) {
+					var checked = (data.activo==1 ? 'checked' : '');
+					return '<div class="custom-control custom-checkbox ml-auto pl-4">' +
+								'<input type="checkbox" class="custom-control-input" ' +
+								' onclick="savDeta('+data.id+')" '+checked+
+								' id="marcar'+data.id+'">' +
+								'<label class="custom-control-label font-weight-normal"' +
+								' for="marcar'+data.id+'"> </label>' +
+							'</div>';
+				},
+				sClass: 'text-center'
+			}
+		],
+		rowCallback: function(row, data) {
+			if(data.activo==0) {
+				$(row).css({'text-decoration': 'line-through', 'font-style': 'italic', 'color': '#929292' }) 
+			}
+		}
+	});
+
+	function guardarTasaDolar(valor, fecha) {
+		$.ajax({
+			data: {
+				opcion: "guardarTasaDolar",
+				idpara: valor+'¬'+$('#uinombre').val().toUpperCase() + ' (' + $('#uilogin').val() + ')',
+				fecha : fecha,
+			},
+			type: "POST",
+			dataType: "json",
+			url: "app/DBProcs.php",
+			success : function(data) {
+				if(data==1) {
+					$('#lstTasasUSD').DataTable().ajax.reload( null, false );
+				} else {
+					if(data==2) {
+						msg.fire({
+							title: '!!! A T E N C I Ó N ¡¡¡',
+							icon: 'warning',
+							html: 'Tasa del <b>'+moment(fecha).format('DD-MM-YYYY')+
+								'</b> con el monto <b>'+($('#montousd').val()/100).toFixed(4).replace(/\d(?=(\d{3})+\.)/g, '$&,')+
+								'</b><br>ya se encuentra registrada ',
+							showCancelButton: false,
+						})
+					}
+				}
+			}
+		});
+	}
+
+	function savDeta(id) {
+		marcar = $('#marcar'+id).prop('checked') ? 1 : 0;
+		$.ajax({
+			url: "app/DBProcs.php",
+			data: {
+				opcion: "marcarTasa",
+				idpara: id+'¬'+marcar,
+			},
+			type: "POST",
+			dataType: "json",
+			success : function(data) {
+				if(data==0) {
+					alert('Hubo un error no se pudo marcar el registro:' + id)
+				} else {
+					$('#lstTasasUSD').DataTable().ajax.reload( null, false );
+				}		
+			}
+		});
+	}
+</script>

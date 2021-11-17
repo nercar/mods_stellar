@@ -1,0 +1,156 @@
+<!-- Main row -->
+<div class="row">
+	<!-- Auditoria de Costos -->
+	<div class="col-md-12 col-sm-12 mt-2" id="div_tbl_datos">
+		<div class="card card-primary m-0 p-0 elevation-2 border border-dark">
+			<div class="card-header d-flex p-1 pl-2 mb-1 align-items-baseline">
+				<i class="fas fa-file-alt"></i>&nbsp;
+				<span id="ttitulo">Lista de Productos</span>
+			</div>
+			<div class="row m-0 p-0" id="divDatos">
+				<div class="col-12">
+					<table class="w-100 table-bordered" id="buscar">
+						<tr class="bg-dark text-center">
+							<th rowspan="2" width="10%">Buscar por:</th>
+							<th width="35%">Productos</th>
+							<th width="35%">Departamento</th>
+							<th width="10%">Productos</th>
+							<th width="10%" id="tasaact">&nbsp;</th>
+						</tr>
+						<tr>
+							<td>
+								<input type="text" style="display: none;" placeholder="Buscar Producto">
+								<input type="text" class="form-control form-control-sm m-0 p-1"
+									value="" placeholder="Buscar Producto" id="BuscarArti" 
+									onkeydown="if(event.keyCode==13 && $(this).val().trim()!='') {
+										$('#btn_consultar').click();
+									}">
+							</td>
+							<td>
+								<select id="select_dptos" class="form-control form-control-sm p-0">
+								</select>
+							</td>
+							<td>
+								<div class="col-auto my-1">
+									<div class="custom-control custom-checkbox mr-sm-2 text-nowrap">
+										<input type="checkbox" class="custom-control-input" id="precio0">
+										<label class="custom-control-label" for="precio0">Con Precio 0</label>
+									</div>
+								</div>
+							</td>
+							<td>
+								<button class="btn btn-primary btn-sm w-100" id="btn_consultar">
+									<i class="fas fa-search"></i>&nbsp;Consultar
+								</button>
+							</td>
+						</tr>
+					</table>
+				</div>
+				<div class="col-12">
+					<div class="p-0 m-0" id="frmarticulos">
+						<table width="100%" id="tbl_produsd" cellpadding="0" cellspacing="0"
+							class="table table-striped table-hover table-bordered m-0 p-0">
+							<thead>
+								<tr class="bg-warning-gradient">
+									<th width="10%" class="text-center txtcomp p-0 m-0">Código</th>
+									<th width="40%" class="text-center txtcomp p-0 m-0">Descripción</th>
+									<th width="15%" class="text-center txtcomp p-0 m-0">Costo</th>
+									<th width="15%" class="text-center txtcomp p-0 m-0">Precio</th>
+									<th width="10%" class="text-center txtcomp p-0 m-0">Costo USD</th>
+									<th width="10%" class="text-center txtcomp p-0 m-0">Precio USD</th>
+								</tr>
+							</thead>
+						</table>
+					</div>
+					<div class="col-12 m-0 p-0 pt-1 text-center" id="botones">
+						<button class="btn btn-sm btn-success" id="btnExport">
+							<i class="fas fa-file-excel"></i> Exportar
+						</button>
+						<button class="btn btn-sm btn-danger" onclick="cargarcontenido('export_prod')">
+							<i class="fas fa-broom"></i>&nbsp;Limpiar
+						</button>
+					</div>
+				</div>
+			</div>
+			<!-- /.card-body -->
+		</div>
+	</div>
+	<!-- /.col -->
+</div>
+<!-- /.row (main row 2) -->
+
+<script>
+	$('#divDatos').height($('#wp_ppal').height()-$('#buscar').height()-10);
+	var altoTablaPpal = $('#divDatos').height()-$('#btn_consultar').offset().top-10;
+
+	// Se consultan los departamentos para seleccionar
+	$.ajax({
+		data: { opcion: "listaDptos" },
+		type: "POST",
+		dataType: "json",
+		url: "app/DBProcs.php",
+		success: function(data) {
+			$("#select_dptos").append('<option value="*">Todos los Dptos</option>');
+			for (i=0; i<data.length; i++) {
+				$("#select_dptos").append('<option value="'+ data[i].codigo + '">' + data[i].descripcion + '</option>');
+			}
+		}
+	})
+
+	$('#tbl_produsd').DataTable( { scrollY: altoTablaPpal + 'px' } ).columns.adjust().draw();
+
+	$('#btn_consultar').on('click', function() {
+		cargando('show');
+		tomar_datos = $.ajax({
+			url: "app/DBProcs.php",
+			data: {
+				opcion: "export_prod",
+				produc: $('#BuscarArti').val().trim(),
+				dptos : $("#select_dptos").val(),
+				precio: $('#precio0').is(':checked')?1:0,
+			},
+			type: "POST",
+			dataType: "json",
+			success : function(datos) {
+				tasa = datos.tasa;
+				$('#tasaact').html('<span class="bg-warning-gradient m-0 p-0 pl-1 pr-1 rounded">'+tasa+'</span>')
+				datos = datos.datos;
+				$('#tbl_produsd').dataTable( {
+					scrollY        : altoTablaPpal + 'px',
+					scrollCollapse : false,
+					searching      : true,
+					autoWidth      : false,
+					order: [ 3, 'desc' ],
+					buttons: [
+						{
+							extend: 'excelHtml5',
+							title: $('#ttitulo').html(),
+							messageTop: 'Montos en USD a la tasa ' + tasa,
+							filename: 'MA_PRODUCTOS',
+							autoFilter: true,
+							sheetName: 'Listado de Productos',
+						}
+					],
+					data: datos,
+					columns: [
+						{ data: "codigo", sClass: "txtcomp m-0 p-0 text-left text-nowrap align-middle border border-top-0 border-bottom-0" },
+						{ data: "descripcion", sClass: "txtcomp m-0 p-0 text-left  align-middle border border-top-0 border-bottom-0" },
+						{ data: "costo", sClass: "txtcomp m-0 p-0 text-right align-middle border border-top-0 border-bottom-0", render: $.fn.dataTable.render.number(",", ".", 4) },
+						{ data: "precio", sClass: "txtcomp m-0 p-0 text-right align-middle border border-top-0 border-bottom-0", render: $.fn.dataTable.render.number(",", ".", 4) },
+						{ data: "costo_usd", sClass: "txtcomp m-0 p-0 text-right align-middle border border-top-0 border-bottom-0" },
+						{ data: "precio_usd", sClass: "txtcomp m-0 p-0 text-right align-middle border border-top-0 border-bottom-0" },
+					],
+					initComplete: function() {
+						$('#tbl_produsd').DataTable().columns.adjust().draw();
+					},
+				});
+			}
+		}).done(function() {
+			cargando('hide');
+		})
+	});
+
+	$('#btnExport').on('click', function (){
+		$('#tbl_produsd').DataTable().button( '0' ).trigger();
+	})
+</script>
